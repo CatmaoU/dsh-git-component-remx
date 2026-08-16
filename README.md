@@ -9,7 +9,7 @@
 > 本包是上游的本地定制增强版（remx），保留了上游全部功能并新增下方「新增功能」一节所述能力。
 >
 > **⚠️ 附属插件 / Companion**: 本插件是源插件 `dsh-git-component` 的附属增强，**必须先安装源插件**才能使用。
-> 缺失时插件会拒绝加载 Git 面板，并弹出「缺少源插件」提示条（含安装命令复制与 GitHub 下载链接）。
+> 缺失时插件会加载失败
 
 ## 功能 / Features
 
@@ -42,7 +42,7 @@
 - **沙箱修复**：git 网络操作（ls-remote / push / @{u} 探测）绕过 dsh 的 pwsh 沙箱（`execFile` 直跑，修复 remote-https 管道 Permission denied 与 `@{u}` 被 PowerShell 解析为 hash literal 两个问题）
 
 ## 安装 / Install
-
+可以丢给dsh让它自己安装
 **先安装源插件（必装，本插件是其附属）**：
 
 ```sh

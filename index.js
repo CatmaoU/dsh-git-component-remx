@@ -153,7 +153,7 @@ export default {
             source: { kind: 'user' },
           }],
           temperature: opts.temperature ?? 0.3,
-          maxTokens: opts.maxTokens ?? 800,
+          maxTokens: opts.maxTokens ?? 2000,
           stop: opts.stop,
         })
         for await (const chunk of stream) {
@@ -540,6 +540,10 @@ export default {
         const userPrompt = '请为以下更改生成提交信息：\n' + summary.slice(0, 6000)
         let text = ''
         let failure = null
+        // 推理模型（deepseek-v4-flash 等）的 max_tokens 是输出总预算（含 reasoning tokens），
+        // high effort 推理会吃光 200 → text 为空 → 「AI 未能生成提交信息」。故预算提到
+        // 2000 给推理留足空间；stop: ['\n'] 会对整条生成生效（推理/文本中的换行提前终止），
+        // 一并去掉，改为生成后按第一行截断（保持单行提交信息约束）。
         const stream = llm.stream({
           provider: selection.provider,
           model: selection.model,
@@ -552,8 +556,7 @@ export default {
             source: { kind: 'user' },
           }],
           temperature: 0.3,
-          maxTokens: 200,
-          stop: ['\n'],
+          maxTokens: 2000,
         })
         for await (const chunk of stream) {
           if (chunk.type === 'text-delta') text += chunk.text
@@ -565,7 +568,7 @@ export default {
         if (!text.trim() && failure) {
           return send(res, 200, { ok: false, error: 'AI 生成失败: ' + (failure.message || failure.code || '未知错误') })
         }
-        let msg = text.trim().replace(/^["'`]+|["'`]+$/g, '')
+        let msg = text.trim().replace(/^["'`]+|["'`]+$/g, '').split(/\r?\n/)[0].trim()
         if (!msg) return send(res, 200, { ok: false, error: 'AI 未能生成提交信息' })
         send(res, 200, { ok: true, message: msg })
       } catch (e) { send(res, 500, { ok: false, error: String((e && e.message) || e) }) }
@@ -617,7 +620,7 @@ export default {
         const { text, failure } = await llmText(llm, modelSvc, system, stateText, {
           id: 'git-component-autofix',
           temperature: 0.2,
-          maxTokens: 800,
+          maxTokens: 2000,
         })
         if (!text && failure) {
           return send(res, 200, { ok: false, error: 'AI 修复失败: ' + (failure.message || failure.code || '未知错误') })

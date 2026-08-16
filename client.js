@@ -366,9 +366,18 @@ body[data-ds-dark-theme] .dsh-git-componentanel-tok.number { color: #fbbf24; }
 		// ---- settings 开关（仿 dsh-drop-in 模式）：settingsScope.bind({namespace}) 返回
 		// controller（getSnapshot/subscribe/set）。namespace 由 host 半 index.js 注册。
 		// 双保险：settingsScope 不可用（host 半未重启、namespace 未注册）时回退 localStorage，
-		// 保证开关「实时保存」跨刷新保持；settingsScope 可用后以它为准（真持久化到 settings.yaml）。
+		// 保证开关「实时保存」跨刷新保持。
+		// 【读取主次】localStorage 为主通道（用户最后设置值优先、即写即读），settingsScope
+		// 快照仅作初始来源。原因：git-component 不在 dsh-host-apiproxy 的
+		// WEB_SETTINGS_NAMESPACES 白名单，settingsScope 快照 status=unavailable/writable=false，
+		// set 会被拒、快照永不更新；若读优先快照，滑块/开关会被弹回旧值。
+		// 【同窗口通知】localStorage.setItem 不会触发本窗口的 storage 事件（仅跨标签页），
+		// settingsScope 不可写也不发通知，故用本地订阅总线（enabledListeners/opacityListeners）
+		// 在 set 后主动通知所有订阅者 → useSyncExternalStore 即时重渲染（实时渲染）。
 		const LS_ENABLED_KEY = "dsh-git-component-enabled";
 		const LS_POS_KEY = "dsh-git-component-pos";
+		const enabledListeners = new Set();
+		const opacityListeners = new Set();
 		let settingsScope = null;
 		function bindSettingsScope(ctx) {
 			try {
@@ -391,29 +400,29 @@ body[data-ds-dark-theme] .dsh-git-componentanel-tok.number { color: #fbbf24; }
 			return null;
 		}
 		function isEnabled() {
-			const value = scopeValue();
-			if (value !== null) return value.enabled !== false;
 			try {
 				const raw = localStorage.getItem(LS_ENABLED_KEY);
 				if (raw !== null) return raw !== "0";
 			} catch (e) {}
+			const value = scopeValue();
+			if (value !== null) return value.enabled !== false;
 			return true;
 		}
 		function subscribeEnabled(fn) {
+			enabledListeners.add(fn);
+			let unsub = () => {};
 			try {
 				if (settingsScope && typeof settingsScope.subscribe === "function") {
-					const unsub = settingsScope.subscribe(fn);
-					const onStorage = () => { try { if (localStorage.getItem(LS_ENABLED_KEY) !== null) fn(); } catch (e) {} };
-					window.addEventListener("storage", onStorage);
-					return () => { unsub(); window.removeEventListener("storage", onStorage); };
+					unsub = settingsScope.subscribe(fn);
 				}
 			} catch (e) {}
-			try {
-				const onStorage = () => fn();
-				window.addEventListener("storage", onStorage);
-				return () => window.removeEventListener("storage", onStorage);
-			} catch (e) {}
-			return () => {};
+			const onStorage = () => { try { fn(); } catch (e) {} };
+			try { window.addEventListener("storage", onStorage); } catch (e) {}
+			return () => {
+				enabledListeners.delete(fn);
+				try { unsub(); } catch (e) {}
+				try { window.removeEventListener("storage", onStorage); } catch (e) {}
+			};
 		}
 		function setEnabled(next) {
 			try { localStorage.setItem(LS_ENABLED_KEY, next ? "1" : "0"); } catch (e) {}
@@ -422,15 +431,12 @@ body[data-ds-dark-theme] .dsh-git-componentanel-tok.number { color: #fbbf24; }
 					Promise.resolve(settingsScope.set("enabled", next)).catch(() => {});
 				}
 			} catch (e) {}
+			enabledListeners.forEach((fn) => { try { fn(); } catch (e) {} });
 		}
-		// ---- 面板背景不透明度（0-100）：settingsScope 优先，localStorage 兜底，默认 88。 ----
+		// ---- 面板背景不透明度（0-100）：localStorage 主通道优先，settingsScope 快照兜底，默认 88。 ----
 		const LS_OPACITY_KEY = "dsh-git-component-opacity";
 		const DEFAULT_OPACITY = 88;
 		function getOpacity() {
-			const value = scopeValue();
-			if (value !== null && typeof value.opacity === "number" && isFinite(value.opacity)) {
-				return Math.min(100, Math.max(0, Math.round(value.opacity)));
-			}
 			try {
 				const raw = localStorage.getItem(LS_OPACITY_KEY);
 				if (raw !== null) {
@@ -438,23 +444,27 @@ body[data-ds-dark-theme] .dsh-git-componentanel-tok.number { color: #fbbf24; }
 					if (!isNaN(n)) return Math.min(100, Math.max(0, n));
 				}
 			} catch (e) {}
+			const value = scopeValue();
+			if (value !== null && typeof value.opacity === "number" && isFinite(value.opacity)) {
+				return Math.min(100, Math.max(0, Math.round(value.opacity)));
+			}
 			return DEFAULT_OPACITY;
 		}
 		function subscribeOpacity(fn) {
+			opacityListeners.add(fn);
+			let unsub = () => {};
 			try {
 				if (settingsScope && typeof settingsScope.subscribe === "function") {
-					const unsub = settingsScope.subscribe(fn);
-					const onStorage = () => { try { if (localStorage.getItem(LS_OPACITY_KEY) !== null) fn(); } catch (e) {} };
-					window.addEventListener("storage", onStorage);
-					return () => { unsub(); window.removeEventListener("storage", onStorage); };
+					unsub = settingsScope.subscribe(fn);
 				}
 			} catch (e) {}
-			try {
-				const onStorage = () => fn();
-				window.addEventListener("storage", onStorage);
-				return () => window.removeEventListener("storage", onStorage);
-			} catch (e) {}
-			return () => {};
+			const onStorage = () => { try { fn(); } catch (e) {} };
+			try { window.addEventListener("storage", onStorage); } catch (e) {}
+			return () => {
+				opacityListeners.delete(fn);
+				try { unsub(); } catch (e) {}
+				try { window.removeEventListener("storage", onStorage); } catch (e) {}
+			};
 		}
 		function setOpacity(next) {
 			const n = Math.min(100, Math.max(0, Math.round(Number(next) || 0)));
@@ -464,6 +474,7 @@ body[data-ds-dark-theme] .dsh-git-componentanel-tok.number { color: #fbbf24; }
 					Promise.resolve(settingsScope.set("opacity", n)).catch(() => {});
 				}
 			} catch (e) {}
+			opacityListeners.forEach((fn) => { try { fn(); } catch (e) {} });
 			return n;
 		}
 		function loadPos() {
@@ -1409,7 +1420,17 @@ body[data-ds-dark-theme] .dsh-git-componentanel-tok.number { color: #fbbf24; }
 				const enabled = React.useSyncExternalStore(subscribeEnabled, isEnabled, isEnabled);
 				const toggle = (e) => setEnabled(!!e.target.checked);
 				const opacity = React.useSyncExternalStore(subscribeOpacity, getOpacity, getOpacity);
-				const changeOpacity = (e) => setOpacity(parseInt(e.target.value, 10) || 0);
+				// 滑块用内部 state 承载拖动值：onChange 立即 setSliderVal + setOpacity（写
+				// localStorage + 通知本地订阅总线），再经 useEffect 与外部 opacity 同步。
+				// 拖动过程不依赖外部快照（settingsScope 不可写/跨窗口 storage）的滞后刷新，
+				// 受控 value 即时跟随，绝不弹回；面板侧 GitPanel 订阅同一总线实时渲染。
+				const [sliderVal, setSliderVal] = React.useState(opacity);
+				React.useEffect(() => { setSliderVal(opacity); }, [opacity]);
+				const changeOpacity = (e) => {
+					const n = parseInt(e.target.value, 10) || 0;
+					setSliderVal(n);
+					setOpacity(n);
+				};
 				return h("div", { className: "dsh-git-componentanel-settings" },
 					h("h2", { className: "dsh-git-componentanel-settings-title" }, "Git 面板"),
 					h("label", { className: "dsh-git-componentanel-settings-row" }, [
@@ -1421,7 +1442,7 @@ body[data-ds-dark-theme] .dsh-git-componentanel-tok.number { color: #fbbf24; }
 							h("span", { key: "t" }, "面板透明度（透明 → 云母磨砂）"),
 							h("span", { key: "v", className: "dsh-git-componentanel-settings-range-val" }, String(opacity) + " / 100"),
 						]),
-						h("input", { key: "slider", type: "range", min: 0, max: 100, step: 1, value: opacity, onChange: changeOpacity }),
+						h("input", { key: "slider", type: "range", min: 0, max: 100, step: 1, value: sliderVal, onChange: changeOpacity }),
 					]),
 					h("p", { key: "d", className: "dsh-git-componentanel-settings-desc" }, "0 完全透明；100 云母磨砂（不透明 + 背景模糊）。关闭开关后不再显示面板；面板默认隐藏，检测到当前目录是 Git 仓库时才显示。"),
 				);

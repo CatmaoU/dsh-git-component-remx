@@ -1,0 +1,57 @@
+{
+  "name": "dsh-git-component-remx",
+  "version": "0.1.0",
+  "description": "Companion of dsh-git-component: enhanced Git panel for the DeepSeek Harness Web GUI — floating panel with branch-target push, connection lights, AI push-failure repair and AI commit-message autofill. Requires the source plugin dsh-git-component to be installed.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "LICENSE",
+    "README.md"
+  ],
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "plugin",
+    "git",
+    "webui",
+    "web-ui",
+    "panel",
+    "companion"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime"
+      ]
+    },
+    "companion": {
+      "requires": "dsh-git-component",
+      "source": "github:nieyunliang/dsh-git-component"
+    }
+  },
+  "peerDependencies": {
+    "dsh-git-component": ">=0.1.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CatmaoU/dsh-git-component-remx.git"
+  }
+}

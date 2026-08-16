@@ -1,0 +1,16 @@
+# dsh-git-component-remx bundle layer — applied when a profile lists this bundle
+# (package.json declares `dsh.bundle.patch` pointing at this file).
+#
+# The row id `git-component` is also the client-module id: the browser bundle is
+# served at /plugins/git-component/client.js via the package's `dsh.client`
+# declaration (exports["./client"]).
+#
+# `inject: [webServer, shell]` matters: profile activation is
+# service-availability driven, so without it this row could apply before
+# webServer/shell exist and silently no-op (no routes, no panel).
+- insert:
+    - id: git-component
+      name: dsh-git-component-remx
+      inject:
+        - webServer
+        - shell

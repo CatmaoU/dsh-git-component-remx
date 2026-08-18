@@ -2,11 +2,16 @@
 # (package.json declares `dsh.bundle.patch` pointing at this file).
 #
 # The row id `git-component-remx` is the loader entry id for this companion
-# bundle. The client module is served at /plugins/dsh-git-component-remx/client.js
-# via the package's `dsh.client` declaration (exports["./client"]). Keeping both
-# the entry id and the package name distinct from the source plugin
-# dsh-git-component lets the two bundles coexist in one profile without loader
-# entry collisions or duplicate /git-component/* HTTP routes.
+# bundle; it is distinct from the source plugin row, so the two bundles can be
+# assembled in one profile without loader-entry collisions.
+#
+# IMPORTANT — HTTP routes are NOT distinct. Both bundles register the very same
+# /git-component/* endpoints (status/conn/diff/commit/push/stage/verify/
+# automessage/autofix) and webServer rejects a duplicate exact route, which
+# aborts dsh web boot. This companion therefore takes the routes over: the
+# patch below disables the source plugin row whenever this bundle is present.
+# Using the enhanced panel means the upstream panel is off — they are
+# mutually exclusive by design (see README 安装/Install).
 #
 # `inject: [webServer, shell]` matters: profile activation is
 # service-availability driven, so without it this row could apply before
@@ -17,3 +22,8 @@
       inject:
         - webServer
         - shell
+# Suppress the source plugin so its duplicate /git-component/* routes never
+# collide with ours. `disabled` matches the existing loader row by id; it is a
+# no-op when the source plugin is not assembled.
+- id: git-component
+  disabled: true

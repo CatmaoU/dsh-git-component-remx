@@ -69,7 +69,16 @@ dsh plugin --profile web add ./dsh-git-component-remx
 
 > `dsh plugin add` 会自动把声明了 `dsh.bundle.patch` 的包加入该 profile 的
 > `dsh.profile.bundles` 层（即 `dsh plugin --profile web --dump-config` 里能看到
-> `git-component` 这一行）。之后**重启** webui 进程生效（Node 模块缓存不会热替换旧代码）。
+> `git-component-remx` 这一行）。之后**重启** webui 进程生效（Node 模块缓存不会热替换旧代码）。
+>
+> **⚠️ 与源插件互斥（v0.2.0 起自动处理）**：官方 `dsh-git-component` 与本 remx
+> 注册**完全相同**的 `/git-component/*` HTTP 路由，`webServer` 不允许重复注册，
+> 两个同时装配会导致 dsh web 启动崩溃（`webserver: duplicate exact route
+> "/git-component/status"`）。因此本 bundle 装配时会在 profile 层自动把官方
+> 入口（loader row `git-component`）置为 `disabled`，由 remx 独占路由——
+> **不用手动改配置**。若你确实想用官方面板，需把 remx 从 bundles 移除（二者二选一）。
+> 极端情况下（官方抢先注册），remx 的路由注册也会静默跳过重复项并告警，
+> 不会再让整个 dsh web 启动失败。
 >
 > 注意：git 源安装需要 pnpm 允许构建脚本（`prepare`），如被拦截请按 pnpm 提示在
 > profile 的 `pnpm-workspace.yaml` 的 `allowBuilds` 中加入对应 key 后重试。

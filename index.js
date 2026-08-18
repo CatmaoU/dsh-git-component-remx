@@ -279,7 +279,24 @@ export default {
       req.on('error', reject)
     })
     const queryOf = (req) => new URL(req.url, 'http://dsh.local').searchParams
-    const route = (path, handler) => ctx.effect(() => webServer.register({ kind: 'exact', path, handler }))
+    const route = (path, handler) => ctx.effect(() => {
+      try {
+        webServer.register({ kind: 'exact', path, handler })
+      } catch (err) {
+        // 冲突兜底：官方 dsh-git-component 也注册 /git-component/* 同名路由，
+        // 两个 bundle 同时装配时 register 抛 `duplicate exact route`，会拖垮整个
+        // dsh web 启动。正常装配下本 bundle 的 cordis.patch.yml 已把官方入口
+        // disabled、路由由 remx 独占；此处 try/catch 保证即使官方抢先注册
+        //（例如用户手工改过 profile patch、装配顺序变化）也只是跳过重复路由
+        // 并告警，绝不让 dsh web 因路由重复而启动失败。
+        const msg = String((err && err.message) || err)
+        if (msg.includes('duplicate')) {
+          console.warn('[dsh-git-component-remx] skip duplicate route ' + path + ' (' + msg + ')')
+          return
+        }
+        console.error('[dsh-git-component-remx] route ' + path + ' failed: ' + msg)
+      }
+    })
 
     route('/git-component/status', async (req, res) => {
       try {

@@ -1,7 +1,7 @@
 {
   "name": "dsh-git-component-remx",
-  "version": "0.1.0",
-  "description": "Companion of dsh-git-component: enhanced Git panel for the DeepSeek Harness Web GUI — floating panel with branch-target push, connection lights, AI push-failure repair and AI commit-message autofill. Requires the source plugin dsh-git-component to be installed.",
+  "version": "0.2.0",
+  "description": "Companion of dsh-git-component: enhanced Git panel for the DeepSeek Harness Web GUI — floating panel with branch-target push, connection lights, AI push-failure repair and AI commit-message autofill. Requires the source plugin dsh-git-component to be installed; installing this bundle auto-disables the source plugin because both share the /git-component/* routes.",
   "license": "MIT",
   "type": "module",
   "main": "./index.js",
